@@ -5,7 +5,7 @@ import { requestImage } from '../api/images.mjs';
 import { definitions, templatePath } from '../generation/sheets.mjs';
 import * as pixels from '../image-processing/canvas.mjs';
 import { validateTarget, targetImage, revisionInstruction } from './targets.mjs';
-import { revisionPrompt } from './prompts.mjs';
+import { revisionPrompt, defaultRevisionPrompts } from './prompts.mjs';
 import { startActivity } from '../activity.mjs';
 
 async function loadReference(name) {
@@ -14,7 +14,7 @@ async function loadReference(name) {
   return response.blob();
 }
 
-export function createRevisionService({ save, notify = () => {}, generate = requestImage, images = pixels, asset = loadReference }) {
+export function createRevisionService({ save, notify = () => {}, generate = requestImage, images = pixels, asset = loadReference, getPrompts = () => defaultRevisionPrompts }) {
   const active = new Set();
 
   async function persist(job, update) {
@@ -34,6 +34,7 @@ export function createRevisionService({ save, notify = () => {}, generate = requ
       auth = validateAuth(auth);
       if (auth.provider !== job.provider) throw Error(`Select ${providerName(job.provider)} in Setup to revise this job.`);
       active.add(job.id);
+      const prompts = getPrompts();
       const activity = startActivity(job, notify, 'Generating revision', 'revision');
       try {
         const source = targetImage(job, target);
@@ -55,12 +56,12 @@ export function createRevisionService({ save, notify = () => {}, generate = requ
           const template = await asset(templatePath(job.templateSet, definition.number));
           references.push(await images.crop(template, target.index));
         }
-        const prompt = revisionPrompt({ target, rectangle: working.rectangle, instruction, emotion, neutralReference });
+        const prompt = revisionPrompt({ target, rectangle: working.rectangle, instruction, emotion, neutralReference }, prompts);
         const output = await generate(prompt, references, {
           size: `${working.rectangle.canvasWidth}x${working.rectangle.canvasHeight}`,
           quality: opaque ? 'medium' : job.settings.quality,
           background: opaque ? 'opaque' : 'transparent'
-        }, auth, undefined, phase => activity.update(phase));
+        }, { ...auth, model: auth.model || job.model }, undefined, phase => activity.update(phase));
         activity.update('processing');
         const candidate = await images.extractRevision(output, working.rectangle, opaque);
         const pendingRevision = { target, image: candidate, width: working.rectangle.width, height: working.rectangle.height };

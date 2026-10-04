@@ -6,9 +6,9 @@ Start with `src/main.mjs`. It connects the views, saved jobs, and generation pip
 
 | Folder | Responsibility |
 | --- | --- |
-| `src/api/` | In-memory credentials and direct OpenAI/OpenRouter image requests. |
+| `src/api/` | In-memory credentials, model discovery, and direct OpenAI/OpenRouter image requests. |
 | `src/ui/` | Setup controls, result previews, history, and escaped HTML. |
-| `src/generation/` | Emotion definitions, prompts, canonical confirmation, sequential sheets, and resume. |
+| `src/generation/` | Emotion definitions, editable prompt defaults, canonical confirmation, anchored parallel sheets, and resume. |
 | `src/revisions/` | Target validation, localized edit prompts, candidate generation, transactional acceptance, and a memory-only queue. |
 | `src/image-processing/` | Canvas normalization, resizing, cropping, and Neutral anchoring. |
 | `src/storage/` | The explicit saved-job schema and IndexedDB access. |
@@ -20,10 +20,10 @@ Start with `src/main.mjs`. It connects the views, saved jobs, and generation pip
 
 ## Generation flow
 
-1. Setup returns a provider/key pair from the page's memory when an operation starts.
+1. Setup returns a provider/key/model selection from page memory when an operation starts. Loading compatible image models uses the provider's `/models` endpoint. Custom prompt templates live in localStorage, separately from keys and jobs.
 2. The pipeline validates the upload and saves a job with the provider name, images, settings, and progress.
 3. Canonical generation returns to the UI for confirmation. Sheets cannot start before confirmation.
-4. Each sheet is generated and cropped before the next begins. B, C, and D reuse Sheet A's Neutral crop.
+4. Sheet A generates and crops first. B, C, and D then run concurrently using A's Neutral crop. Concurrent checkpoints serialize browser storage writes. A failed sheet does not stop the others; resume skips completed sheets.
 5. Every checkpoint passes through the saved-field allowlist before reaching IndexedDB.
 6. Reloading converts unfinished work to an interrupted state. Resume requires re-entering the matching provider key and reuses saved images.
 
@@ -35,7 +35,7 @@ Pending candidates save only their target, image, and dimensions. Accept and dis
 
 - `src/api/credentials.mjs`: the key session is a closure over an in-memory Map. It has no storage imports or storage calls.
 - `src/ui/setup.mjs`: keys live in the input and that session. Clear keys forgets both providers. Leaving the page clears the session.
-- `src/api/images.mjs`: the only outgoing key use is the Authorization header to a fixed provider URL. Requests omit cookies, disable caching, and reject redirects. Error text is redacted before display.
+- `src/api/images.mjs` and `src/api/models.mjs`: outgoing key use is limited to Authorization headers on fixed provider URLs. Requests omit cookies, disable caching, and reject redirects. Image error text is redacted before display.
 - `src/generation/pipeline.mjs`: credentials are passed as operation arguments and never attached to jobs.
 - `src/storage/job-record.mjs`: storage is built field by field. Unknown fields and provider error messages are excluded at every checkpoint.
 - `src/storage/jobs.mjs`: the only persistent writer calls `jobRecord()` before storing anything.

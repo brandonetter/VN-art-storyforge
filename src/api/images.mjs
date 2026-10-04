@@ -1,6 +1,7 @@
 // Send image requests directly to a fixed provider URL with an in-memory Authorization header.
 // API keys are never included in request URLs, image payloads, storage, or logs.
 import { validateAuth, providerName } from './credentials.mjs';
+import { defaultModels } from './models.mjs';
 
 const endpoints = {
   openai: 'https://api.openai.com/v1/images/edits',
@@ -16,9 +17,9 @@ export async function dataUrl(blob) {
   return `data:${blob.type || 'image/png'};base64,${btoa(binary)}`;
 }
 
-function openaiBody(prompt, images, options) {
+function openaiBody(prompt, images, options, model) {
   const body = new FormData();
-  const fields = { model: 'gpt-image-2.5-sunburst', prompt, output_format: 'png', ...options };
+  const fields = { model, prompt, output_format: 'png', ...options };
   for (const [name, value] of Object.entries(fields)) {
     if (name !== 'aspect_ratio') {
       body.append(name, value);
@@ -30,13 +31,13 @@ function openaiBody(prompt, images, options) {
   return body;
 }
 
-async function openrouterBody(prompt, images, options) {
+async function openrouterBody(prompt, images, options, model) {
   const references = await Promise.all(images.map(async (image) => ({
     type: 'image_url',
     image_url: { url: await dataUrl(image) }
   })));
   return JSON.stringify({
-    model: 'openai/gpt-image-2.5-sunburst',
+    model,
     prompt,
     output_format: 'png',
     ...options,
@@ -58,12 +59,14 @@ async function providerError(response, service, key) {
 
 export async function requestImage(prompt, images, options, credentials, fetcher = fetch, onProgress = () => {}) {
   const { provider, key } = validateAuth(credentials);
+  const model = credentials.model || defaultModels[provider];
+  if (typeof model !== 'string' || !model.trim() || model.length > 200) throw Error('Choose a valid image model in Settings.');
   const service = providerName(provider);
   const headers = { Authorization: `Bearer ${key}` };
   const direct = provider === 'openai';
   const body = direct
-    ? openaiBody(prompt, images, options)
-    : await openrouterBody(prompt, images, options);
+    ? openaiBody(prompt, images, options, model)
+    : await openrouterBody(prompt, images, options, model);
   if (!direct) {
     headers['Content-Type'] = 'application/json';
   }

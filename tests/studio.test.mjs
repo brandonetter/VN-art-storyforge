@@ -5,6 +5,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createPipeline, restore } from '../src/generation/pipeline.mjs';
 import { requestImage } from '../src/api/images.mjs';
+import { compatibleModels, listModels, defaultModels } from '../src/api/models.mjs';
+import { sheetPrompt, defaultPrompts } from '../src/generation/prompts.mjs';
+import { revisionPrompt, defaultRevisionPrompts } from '../src/revisions/prompts.mjs';
+import { definitions } from '../src/generation/sheets.mjs';
 import { validateAuth, createKeySession } from '../src/api/credentials.mjs';
 import { jobRecord } from '../src/storage/job-record.mjs';
 import { fitDimensions, panelBounds } from '../src/image-processing/canvas.mjs';
@@ -17,7 +21,7 @@ function harness(failSheet) {
     anchor: async (template, neutral) => { events.push('anchor'); assert.ok(neutral instanceof Blob); return image('anchor'); },
     crop: async (sheet, index) => { events.push(`crop-${index}`); return image(`crop-${index}`); } };
   const pipeline = createPipeline({ save: async (job) => saved.set(job.id, structuredClone(job)), images, asset: async (name) => { assets.push(name); return image(name); },
-    notify: job => activities.push(job.activity ? { ...job.activity } : null),
+    notify: job => activities.push(...(job.activity ? [{ ...job.activity }] : Object.values(job.activities || {}).map(activity => ({ ...activity })))),
     generate: async (prompt, refs, options, auth, fetcher, onProgress) => {
       onProgress('requesting');
       const sheet = prompt.match(/reference for Sheet ([A-D])/i)?.[1]?.toLowerCase() || 'canonical';
@@ -56,7 +60,7 @@ test('Fem and Masc use their own template folders and survive saved-job restore'
   assert.equal(h.requests.length, 0);
 });
 
-test('canonical confirmation gates four sequential sheets and persists no credentials', async () => {
+test('canonical confirmation gates Sheet A before parallel sheets and persists no credentials', async () => {
   const h = harness(), job = await h.pipeline.create(h.image('art'), auth);
   assert.equal(job.stage, 'Awaiting canonical confirmation');
   assert.equal(h.requests.length, 1);
@@ -87,6 +91,35 @@ test('canonical confirmation gates four sequential sheets and persists no creden
   assert.equal(view.getUint16(bytes.length - 12, true), 29);
 });
 
+test('B–D start together only after Sheet A has produced its Neutral cutout', async () => {
+  const image = name => new Blob([name], { type: 'image/png' });
+  const started = [], release = new Map();
+  const pipeline = createPipeline({
+    save: async () => {}, asset: async name => image(name),
+    images: { dimensions: async () => ({ width: 1024, height: 768 }), normalize: async blob => blob,
+      anchor: async () => image('anchor'), crop: async (blob, index) => image(`crop-${index}`) },
+    generate: async (prompt, refs) => {
+      const sheet = prompt.match(/reference for Sheet ([A-D])/i)?.[1]?.toLowerCase() || 'canonical';
+      if (sheet !== 'canonical') started.push({ sheet, anchor: refs[3] });
+      if (sheet !== 'canonical' && sheet !== 'a') await new Promise(resolve => release.set(sheet, resolve));
+      return image(sheet);
+    }
+  });
+  const job = await pipeline.create(image('art'), { ...auth, model: 'gpt-image-1' });
+  const confirming = pipeline.confirm(job, { ...auth, model: 'gpt-image-1-mini' });
+  for (let attempt = 0; attempt < 100 && release.size < 3; attempt++) await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(started.map(item => item.sheet), ['a', 'b', 'c', 'd']);
+  assert.ok(job.sheets[0].raw[0] instanceof Blob);
+  assert.ok(started.slice(1).every(item => item.anchor === job.sheets[0].raw[0]));
+  assert.equal(job.stage, 'Sheets B–D: generating in parallel');
+  release.get('c')(); release.get('d')(); release.get('b')();
+  await confirming;
+  assert.equal(job.stage, 'Complete');
+  assert.equal(job.model, 'gpt-image-1-mini');
+  assert.equal(jobRecord(job).model, 'gpt-image-1-mini');
+  assert.equal(restore(structuredClone(jobRecord(job))).model, 'gpt-image-1-mini');
+});
+
 test('resume after reload reuses completed sheets and accepts a fresh key', async () => {
   const h = harness('b'), job = await h.pipeline.create(h.image('art'), auth);
   await h.pipeline.confirm(job, auth);
@@ -95,9 +128,11 @@ test('resume after reload reuses completed sheets and accepts a fresh key', asyn
   const restored = restore(structuredClone(h.saved.get(job.id))), next = harness();
   await next.pipeline.resume(restored, { provider: 'openai', key: 'replacement' });
   assert.equal(restored.stage, 'Complete');
-  assert.deepEqual(next.requests.map(request => request.sheet), ['b', 'c', 'd']);
+  assert.deepEqual(next.requests.map(request => request.sheet), ['b']);
+  assert.equal(restored.sheets[2].stage, 'Complete');
+  assert.equal(restored.sheets[3].stage, 'Complete');
   assert.equal(next.requests[0].refs[0], restored.sheets[1].anchoredTemplate);
-  assert.equal(next.events.filter(event => event === 'anchor').length, 2);
+  assert.equal(next.events.filter(event => event === 'anchor').length, 0);
   const interrupted = structuredClone(restored);
   interrupted.stage = 'Sheet B: generating';
   interrupted.sheets[1].stage = 'Generating';
@@ -116,7 +151,7 @@ test('canonical and all sheets expose request progress and clear transient loadi
     assert.ok(updates.some(activity => activity.detail?.startsWith('8 of 8 cutouts ready')));
   }
   assert.equal(job.activity, undefined);
-  assert.equal(h.activities.at(-1), null);
+  assert.equal(job.activities, undefined);
   job.activity = { phase: 'requesting' };
   assert.equal(jobRecord(job).activity, undefined);
   assert.equal(restore(job).activity, undefined);
@@ -149,8 +184,57 @@ test('direct browser provider requests preserve references and redact errors', a
       return Response.json({ data: [{ b64_json: btoa('png') }] });
     });
     assert.equal(await output.text(), 'png');
+    await requestImage('prompt', refs, {}, { provider, key: 'secret', model: 'custom-image-model' }, async (url, init) => {
+      assert.equal(provider === 'openai' ? init.body.get('model') : JSON.parse(init.body).model, 'custom-image-model');
+      return Response.json({ data: [{ b64_json: btoa('png') }] });
+    });
     await assert.rejects(() => requestImage('prompt', refs, {}, { provider, key: 'secret' }, async () => Response.json({ error: { message: 'secret rejected' } }, { status: 401 })), /\[redacted\] rejected/);
   }
+});
+
+test('models endpoints filter image-edit-capable models and never put keys in URLs', async () => {
+  const models = { data: [
+    { id: 'gpt-image-1', name: 'GPT image' }, { id: 'gpt-4o' }, { id: 'dall-e-3' },
+    { id: 'vendor/image', architecture: { input_modalities: ['text', 'image'], output_modalities: ['image'] } },
+    { id: 'vendor/text-to-image', architecture: { input_modalities: ['text'], output_modalities: ['image'] } }
+  ] };
+  assert.deepEqual(compatibleModels('openai', models).map(item => item.id), ['gpt-image-1']);
+  assert.deepEqual(compatibleModels('openrouter', models).map(item => item.id), ['vendor/image']);
+  for (const provider of ['openai', 'openrouter']) {
+    const result = await listModels({ provider, key: 'private-key' }, async (url, init) => {
+      assert.ok(url.endsWith('/models'));
+      assert.ok(!url.includes('private-key'));
+      assert.equal(init.headers.Authorization, 'Bearer private-key');
+      assert.equal(init.credentials, 'omit');
+      return Response.json(models);
+    });
+    assert.equal(result.length, 1);
+  }
+  assert.equal(defaultModels.openai, 'gpt-image-2.5-sunburst');
+});
+
+test('pipeline uses edited prompt templates for canonical and sheet requests', async () => {
+  const image = name => new Blob([name], { type: 'image/png' });
+  const prompts = [];
+  const pipeline = createPipeline({
+    save: async () => {}, asset: async name => image(name),
+    getPrompts: () => ({ ...defaultPrompts, canonical: 'My canonical', sheet: 'Custom sheet {sheet}: {anchor}', sheetAnchor: 'Neutral for {sheet}' }),
+    images: { dimensions: async () => ({ width: 1024, height: 768 }), normalize: async blob => blob,
+      anchor: async () => image('anchor'), crop: async () => image('cutout') },
+    generate: async prompt => { prompts.push(prompt); return image('generated'); }
+  });
+  const job = await pipeline.create(image('art'), auth);
+  await pipeline.confirm(job, auth);
+  assert.deepEqual(prompts, ['My canonical', 'Custom sheet A:', 'Custom sheet B: Neutral for B', 'Custom sheet C: Neutral for C', 'Custom sheet D: Neutral for D']);
+});
+
+test('custom prompt text fills only known tokens without reinterpreting user instructions', () => {
+  const sheet = sheetPrompt(definitions[1], { ...defaultPrompts, sheet: '{sheet} {anchor} {panelsTop} {direction}', sheetAnchor: 'anchor for {sheet}', directionB: 'custom direction' });
+  assert.match(sheet, /^B anchor for B Neutral/);
+  assert.match(sheet, /custom direction$/);
+  const prompt = revisionPrompt({ target: { kind: 'canonical' }, rectangle: { canvasWidth: 100, canvasHeight: 200 }, instruction: 'Keep {context} literal' },
+    { ...defaultRevisionPrompts, revision: '{context} Requested change: {instruction}', revisionCanonical: 'my context' });
+  assert.equal(prompt, 'my context Requested change: Keep {context} literal');
 });
 
 test('crop geometry and aspect-preserving resizing match the four-by-two grid', () => {

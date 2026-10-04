@@ -14,6 +14,7 @@ export function jobRecord(job) {
   return {
     id: job.id,
     provider: job.provider,
+    model: job.model,
     templateSet: job.templateSet || 'fem',
     createdAt: job.createdAt,
     stage: job.stage,

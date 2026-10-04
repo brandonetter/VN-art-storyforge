@@ -470,6 +470,56 @@ main {
   padding: 0 24px 24px;
 }
 
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  border-bottom: 1px solid #48483d;
+}
+
+.settings-tabs button {
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #aaa99d;
+}
+
+.settings-tabs button[aria-selected="true"] {
+  color: #d5b56e;
+  border-bottom-color: #d5b56e;
+}
+
+.model-settings {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.prompt-fields {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0;
+}
+
+.prompt-fields label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #eee8dc;
+}
+
+.prompt-fields small { color: #aaa99d; overflow-wrap: anywhere; }
+
+.prompt-fields textarea {
+  width: 100%;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid #565449;
+  border-radius: 7px;
+  background: #282922;
+  color: #eee8dc;
+}
+
 .setup-fields {
   display: grid;
   grid-template-columns: 180px minmax(0,1fr);
@@ -716,7 +766,7 @@ main {
 }
 
 @media(max-width:600px) {
-  .setup-fields {
+  .setup-fields, .model-settings {
     grid-template-columns: 1fr;
   }
   .setup-status {
