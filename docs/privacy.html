@@ -1,0 +1,52 @@
+<!doctype html>
+<!-- Plain-language privacy details for the static studio. This page runs no JavaScript. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>API keys and saved data · Emotional Asset Studio</title>
+    <link rel="stylesheet" href="../styles/studio.css">
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <div class="eyebrow">Emotional Asset Studio</div>
+        <h1>API keys and saved data</h1>
+        <p>The app never saves your API key. Images and job progress are saved separately in your browser.</p>
+
+        <div class="section-head"><h2>What happens to my key?</h2></div>
+        <p>Your key stays in the input field and this tab's JavaScript memory. When you start generation,
+          it is sent directly to OpenAI or OpenRouter in an Authorization header. GitHub Pages hosts
+          the app's static files and does not receive your key through the app.</p>
+        <p>The app does not write keys to IndexedDB, localStorage, sessionStorage, cookies,
+          saved jobs, downloads, or logs. There is no server key, environment fallback, analytics,
+          or third-party JavaScript.</p>
+        <p>Refreshing requires entering your key again. Clear keys forgets both providers' keys
+          from the page. A generation already running keeps its in-memory copy until it finishes;
+          clearing the fields does not cancel that operation.</p>
+
+        <div class="section-head"><h2>What does the app save?</h2></div>
+        <p>IndexedDB stores your uploaded character, canonical reference, generated sheets,
+          cutouts, accepted revisions, pending revision previews, prepared Neutral-anchor templates, provider name, template set, quality, resolution, timestamps, and progress. It never stores
+          credentials. Provider error messages are displayed for the current session and are
+          excluded from saved history.</p>
+        <p>Typed revision instructions, queued requests, and hidden working canvases stay in this tab's
+          memory and are never saved. Refresh forgets them. Generated candidates are saved for your review;
+          the app never automatically repeats a revision request after reloading.</p>
+        <p>Jobs belong to this browser and site address. To remove them, clear this site's data
+          in your browser settings. Download any images you want to keep first.</p>
+
+        <div class="section-head"><h2>What leaves my browser?</h2></div>
+        <p>Your selected provider receives the key, image references, prompt, and generation
+          options needed for the request, including your typed revision instructions and supporting images
+          when revising. That provider's own data policies apply. Cropping,
+          resizing, previewing, and creating ZIP downloads happen locally.</p>
+        <p>These statements describe this app's behavior. Your browser, extensions, device,
+          network tools, and provider may handle data independently; the app cannot control them.</p>
+
+        <p><a href="../index.html">Return to the studio</a></p>
+      </section>
+    </main>
+  </body>
+</html>

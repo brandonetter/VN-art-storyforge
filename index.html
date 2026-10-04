@@ -1,0 +1,135 @@
+<!doctype html>
+<!-- Static page shell; src/main.mjs connects the browser-only studio. No API key is embedded here. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self' https://api.openai.com https://openrouter.ai; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>Emotional Asset Studio</title>
+    <link rel="stylesheet" href="./styles/studio.css">
+    <script type="module" src="./src/main.mjs"></script>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="eyebrow">Character production / asset pipeline</div>
+        <h1>Emotional Asset Studio</h1>
+      </div>
+      <div class="eyebrow">4 sheets &middot; 32 slots</div>
+    </header>
+
+    <main>
+      <details class="panel setup" id="setup" open>
+        <summary>
+          Settings / setup
+          <span class="setup-status" id="setup-status">Choose your image provider</span>
+        </summary>
+        <div class="setup-body">
+          <div class="settings setup-fields">
+            <label>
+              Image provider
+              <select id="provider">
+                <option value="openrouter">OpenRouter</option>
+                <option value="openai">OpenAI</option>
+              </select>
+            </label>
+            <label>
+              <span id="key-label">OpenRouter API key</span>
+              <span class="key-row">
+                <input id="api-key" type="password" autocomplete="off" autocapitalize="none"
+                  spellcheck="false" placeholder="Paste your API key" aria-describedby="key-hint">
+                <button class="secondary" type="button" id="show-key" aria-pressed="false">Show</button>
+                <button class="secondary" type="button" id="clear-key">Clear keys</button>
+              </span>
+            </label>
+          </div>
+          <p class="hint" id="key-hint">
+            API keys are never saved by this app. They stay in this tab's memory and are sent
+            directly to your selected provider only when you generate. Refreshing requires
+            entering your key again. Clear keys forgets both provider keys; it does not cancel
+            a generation already running.
+          </p>
+          <p class="hint">
+            Images and job progress are saved in this browser. Keep the tab open while generating.
+            <a href="./docs/privacy.html">Read about keys and saved data</a>.
+          </p>
+        </div>
+      </details>
+
+      <p class="hint" id="app-message" role="status" aria-live="polite"></p>
+
+      <div class="layout">
+        <aside>
+          <section class="panel">
+            <div class="step"><span>1</span> Character reference</div>
+            <label class="upload">
+              <input id="character" type="file" accept="image/png,image/jpeg,image/webp,image/avif">
+              <img id="preview" alt="Uploaded character preview" hidden>
+              <strong id="upload-title">Choose a character image</strong>
+              <small>PNG, JPEG, WebP, or AVIF &middot; up to 15 MB</small>
+            </label>
+          </section>
+
+          <section class="panel">
+            <div class="step"><span>2</span> Four expression sheets</div>
+            <div class="settings">
+              <label>
+                Templates for new references
+                <select id="template-set" aria-describedby="template-set-hint">
+                  <option value="fem">Fem</option>
+                  <option value="masc">Masc</option>
+                </select>
+              </label>
+            </div>
+            <p class="hint" id="template-set-hint">Choose before generating a reference. Each job keeps its template set.</p>
+            <div class="template-list" id="templates"></div>
+            <div class="settings">
+              <label>
+                Generation quality
+                <select id="quality">
+                  <option value="auto">Auto</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="xhigh">Extra high</option>
+                  <option value="max" selected>Max</option>
+                </select>
+              </label>
+              <label>
+                Maximum sheet resolution
+                <select id="resolution">
+                  <option value="1024x768">1024 &times; 768</option>
+                  <option value="2048x1536">2048 &times; 1536</option>
+                  <option value="3072x2304" selected>3072 &times; 2304</option>
+                  <option value="4096x3072">4096 &times; 3072</option>
+                </select>
+              </label>
+            </div>
+            <button class="primary" id="generate" disabled>Generate canonical reference</button>
+            <p class="hint">
+              Generate a canonical reference at medium quality with transparency off. Confirm it,
+              then process A through D one sheet at a time: generate and cut. Sheet A's Neutral
+              anchors B, C, and D.
+            </p>
+          </section>
+
+          <section class="panel history">
+            <div class="step"><span>&#8634;</span> Saved in this browser</div>
+            <div id="history"><p class="note">No sheets generated yet.</p></div>
+          </section>
+        </aside>
+
+        <div class="workspace">
+          <section class="panel" id="result">
+            <div class="empty">
+              <div class="mark">&#10022;</div>
+              <h2>Your expressions appear here</h2>
+              <p>Upload a character and confirm its canonical reference before generating all four sheets.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
