@@ -88,7 +88,7 @@ export function createResultsView(container, { onConfirm, onResume, onDownload, 
    <div><div class="eyebrow">Production output</div><h2>Character expressions</h2></div>
    <div class="badge">${escape(job.stage)}</div>
   </div>
-  <p class="note">${providerName(job.provider)} &middot; ${templateSetName(job.templateSet)} &middot; ${escape(job.settings.quality)} &middot; up to ${escape(job.settings.resolution)}</p>
+  <p class="note">${providerName(job.provider)} &middot; ${escape(job.model || 'Default image model')} &middot; ${templateSetName(job.templateSet)} &middot; ${escape(job.settings.quality)} &middot; up to ${escape(job.settings.resolution)}</p>
   ${job.error ? `<p class="error" role="alert">${escape(job.error)}</p>` : ''}
   ${job.pendingRevision ? '<button class="secondary" id="review-revision">Review saved revision</button>' : ''}
   ${job.stage === 'Complete' ? `
@@ -105,7 +105,7 @@ export function createResultsView(container, { onConfirm, onResume, onDownload, 
    <button class="primary" id="confirm">Confirm reference and generate all 4 sheets</button>
   ` : ''}
   ${['Failed', 'Interrupted'].includes(job.stage) ? '<button class="primary" id="retry">Resume pipeline</button>' : ''}
-  ${job.sheets.map(sheet => sheetOutput(sheet, job.sheets[0].raw[0], job.activity)).join('')}
+  ${job.sheets.map(sheet => sheetOutput(sheet, job.sheets[0].raw[0], job.activities?.[sheet.key])).join('')}
   `;
       for (const [selector, callback] of [['#confirm', onConfirm], ['#retry', onResume]]) {
         const button = container.querySelector(selector);

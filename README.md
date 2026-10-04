@@ -10,17 +10,17 @@ A lightweight, browser-only studio for turning character art into consistent vis
 - **Open a URL and use it.** The hosted studio runs directly in a modern desktop or mobile browser. Users do not install packages or run a server. GitHub Pages serves the same static files as any other HTTP/HTTPS host.
 - **Bring your own provider key.** Choose OpenAI or OpenRouter in Setup. Generation requests go directly from the browser to that provider, with the key in the Authorization header. The app has no proxy, shared key, environment fallback, or login service.
 - **Never save API keys.** Keys stay in the current tab's JavaScript memory and input field. The app does not write them to IndexedDB, localStorage, sessionStorage, cookies, history, URLs, logs, downloads, or the repository. Refreshing requires entering a key again.
-- **Process images locally where possible.** Resizing, template compositing, cropping, previewing, and ZIP creation use the browser. Only generation and revision requests send the required images and prompts to the selected provider.
+- **Process images locally where possible.** Resizing, template compositing, cropping, previewing, and ZIP creation use the browser. Only generation and revision requests send images and prompts to the selected provider; loading models sends the key but no images.
 - **Keep saved work separate from credentials.** IndexedDB stores image blobs and an explicit allowlist of job metadata. Typed revision instructions, queued requests, loading timers, and provider error messages are not saved.
 
 These are design constraints for future changes, not just deployment conveniences. Adding a backend, persistent credentials, external scripts, or a required installation would change the project's intended model.
 
 ## Use the studio
 
-1. Open the [hosted studio](https://brandonetter.github.io/VN-art-storyforge/), expand **Settings / setup**, select a provider, and enter your own API key.
+1. Open the [hosted studio](https://brandonetter.github.io/VN-art-storyforge/), expand **Settings / setup**, select a provider, and enter your own API key. Use **Load available models** to pick an image-editing model from the provider's `/models` endpoint (or keep the previous default). The **Prompts** tab lets you edit the canonical, sheet, per-sheet directions, anchor, and revision prompt templates; changes are saved locally in this browser and can be reset.
 2. Upload PNG, JPEG, WebP, or AVIF character art, up to 15 MB. Choose **Fem** or **Masc** templates.
 3. Generate the canonical reference. Review identity, clothing, and framing before confirming it.
-4. Choose sheet quality and maximum resolution, then confirm to generate Sheets A–D sequentially. Keep the tab open while they generate and crop.
+4. Choose sheet quality and maximum resolution, then confirm. Sheet A generates and crops first; B–D then generate and crop concurrently, using A's Neutral cutout. Keep the tab open. Concurrent requests may be billed independently; failed sheets can be resumed without regenerating completed sheets.
 5. Download an original sheet, an individual cutout, or the complete ZIP.
 
 Canonical generation uses medium quality and an opaque background. Emotion sheets request transparent backgrounds. The four sheets contain 32 panels; the ZIP contains 29 unique filenames because Neutral appears once, from Sheet A. The spare pose is `spare-slot.png`.
@@ -47,7 +47,7 @@ Images and job progress belong to the current browser and site origin. After rel
 
 The selected provider receives the images, prompts, options, and credentials needed for generation. Its own data policies and account charges apply. The app does not control browser extensions, developer tools, or provider behavior; see the [privacy explanation](docs/privacy.html).
 
-Live generation requires an account with access to the configured image model and supported size/quality settings. Provider endpoints and models are configured in `src/api/images.mjs`. Requests require the provider to allow the site's origin through CORS. If access fails, the studio reports it without routing requests through a server. Tests simulate providers and do not spend API credits.
+Live generation requires an account with access to the selected image-edit model and supported size/quality settings. Model discovery in `src/api/models.mjs` filters OpenAI's image model IDs and OpenRouter models advertising both image input and output. Provider listings do not guarantee support for every option or the image-edit endpoint. The chosen model is saved with each job, and can be changed in Settings before confirming or resuming. Requests require the provider to allow the site's origin through CORS. If access fails, the studio reports it without routing requests through a server. Tests simulate providers and do not spend API credits.
 
 ## Run locally
 
@@ -92,7 +92,7 @@ src/
   main.mjs              App controller
   activity.mjs          Transient operation progress
   api/                  In-memory credentials and direct provider requests
-  generation/           Prompts, sheet definitions, and sequential pipeline
+  generation/           Prompt templates, sheet definitions, and parallel sheet pipeline
   revisions/            Targets, edit prompts, candidate review, and queue
   image-processing/     Browser Canvas resizing, cropping, and anchoring
   storage/              IndexedDB and the saved-field allowlist

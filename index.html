@@ -26,6 +26,11 @@
           <span class="setup-status" id="setup-status">Choose your image provider</span>
         </summary>
         <div class="setup-body">
+          <div class="settings-tabs" role="tablist" aria-label="Settings">
+            <button type="button" role="tab" id="connection-tab" aria-controls="connection-panel" aria-selected="true">Provider &amp; model</button>
+            <button type="button" role="tab" id="prompts-tab" aria-controls="prompts-panel" aria-selected="false">Prompts</button>
+          </div>
+          <div id="connection-panel" role="tabpanel" aria-labelledby="connection-tab">
           <div class="settings setup-fields">
             <label>
               Image provider
@@ -44,9 +49,16 @@
               </span>
             </label>
           </div>
+          <div class="settings model-settings">
+            <label>Image editing model
+              <select id="model" aria-describedby="model-status"></select>
+            </label>
+            <button class="secondary" type="button" id="load-models">Load available models</button>
+          </div>
+          <p class="hint" id="model-status" role="status">Enter a key and load image-capable models for this provider. The default model is selected until then.</p>
           <p class="hint" id="key-hint">
             API keys are never saved by this app. They stay in this tab's memory and are sent
-            directly to your selected provider only when you generate. Refreshing requires
+            directly to your selected provider when you generate or load models. Refreshing requires
             entering your key again. Clear keys forgets both provider keys; it does not cancel
             a generation already running.
           </p>
@@ -54,6 +66,24 @@
             Images and job progress are saved in this browser. Keep the tab open while generating.
             <a href="./docs/privacy.html">Read about keys and saved data</a>.
           </p>
+          </div>
+          <div id="prompts-panel" role="tabpanel" aria-labelledby="prompts-tab" hidden>
+            <p class="hint">Edit the instructions sent to the provider. Tokens in braces are filled at generation time; keep any you need. Changes are saved in this browser, never with jobs or keys. Requested revision text is entered separately when revising.</p>
+            <div class="prompt-fields">
+              <label>Canonical reference <textarea data-prompt="canonical" rows="5"></textarea></label>
+              <label>Expression sheet (A–D) <small>{sheet}, {title}, {panelsTop}, {panelsBottom}, {direction}, {anchor}</small><textarea data-prompt="sheet" rows="10"></textarea></label>
+              <label>Neutral anchor (B–D) <small>{sheet}</small><textarea data-prompt="sheetAnchor" rows="4"></textarea></label>
+              <label>Sheet A direction <textarea data-prompt="directionA" rows="2"></textarea></label>
+              <label>Sheet B direction <textarea data-prompt="directionB" rows="2"></textarea></label>
+              <label>Sheet C direction <textarea data-prompt="directionC" rows="2"></textarea></label>
+              <label>Sheet D direction <textarea data-prompt="directionD" rows="2"></textarea></label>
+              <label>Revision instructions <small>{canvasWidth}, {canvasHeight}, {x}, {y}, {editWidth}, {editHeight}, {context}, {instruction}</small><textarea data-prompt="revision" rows="7"></textarea></label>
+              <label>Canonical revision context <textarea data-prompt="revisionCanonical" rows="4"></textarea></label>
+              <label>Cutout revision context <small>{neutralGuide}, {templateImage}, {emotion}</small><textarea data-prompt="revisionCutout" rows="5"></textarea></label>
+            </div>
+            <button class="secondary" type="button" id="reset-prompts">Reset all prompts to defaults</button>
+            <p class="hint" id="prompt-status" role="status"></p>
+          </div>
         </div>
       </details>
 
@@ -109,8 +139,8 @@
             <button class="primary" id="generate" disabled>Generate canonical reference</button>
             <p class="hint">
               Generate a canonical reference at medium quality with transparency off. Confirm it,
-              then process A through D one sheet at a time: generate and cut. Sheet A's Neutral
-              anchors B, C, and D.
+              then generate and cut Sheet A first. Its Neutral anchors B, C, and D, which run
+              in parallel. Your provider may charge for all three requests.
             </p>
           </section>
 

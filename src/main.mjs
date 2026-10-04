@@ -5,6 +5,7 @@ import { createPipeline, restore } from './generation/pipeline.mjs';
 import { openStorage } from './storage/jobs.mjs';
 import { emotionFiles, zipFiles } from './downloads/zip.mjs';
 import { initializeSetup } from './ui/setup.mjs';
+import { createPromptSettings } from './ui/prompt-settings.mjs';
 import { createResultsView } from './ui/results.mjs';
 import { renderHistory } from './ui/history.mjs';
 import { escapeHtml } from './ui/html.mjs';
@@ -21,6 +22,7 @@ const qualityInput = document.querySelector('#quality');
 const resolutionInput = document.querySelector('#resolution');
 const templateInput = document.querySelector('#template-set');
 const setup = initializeSetup(document.querySelector('#setup'));
+const prompts = createPromptSettings(document.querySelector('#prompts-panel'));
 const jobs = new Map();
 let currentId = null;
 let busy = false;
@@ -89,9 +91,10 @@ function refresh() {
   // Revisions have their own persistent notice and dialog; pipeline activity lives here.
   const activity = job?.activity?.kind !== 'revision' ? job?.activity : null;
   operationProgress.hidden = !busy || queue.request?.status === 'generating';
-  operationProgress.innerHTML = operationProgress.hidden ? '' : activityMarkup(activity || {
-    title: 'Preparing operation', phase: 'preparing', startedAt: operationStartedAt
-  }, job?.provider);
+  const sheetActivities = Object.values(job?.activities || {});
+  operationProgress.innerHTML = operationProgress.hidden ? '' : (sheetActivities.length
+    ? sheetActivities.map(item => activityMarkup(item, job.provider)).join('')
+    : activityMarkup(activity || { title: 'Preparing operation', phase: 'preparing', startedAt: operationStartedAt }, job?.provider));
   if (currentId) {
     results.render(jobs.get(currentId), busy, occupied);
   }
@@ -106,6 +109,7 @@ function selectJob(id) {
   qualityInput.value = job.settings.quality;
   resolutionInput.value = job.settings.resolution;
   templateInput.value = job.templateSet;
+  setup.setModel(job.provider, job.model);
   renderTemplates();
   refresh();
 }
@@ -221,6 +225,7 @@ try {
   }
   pipeline = createPipeline({
     save: job => storage.save(job),
+    getPrompts: () => prompts.snapshot(),
     notify: job => {
       jobs.set(job.id, job);
       currentId = job.id;
@@ -229,6 +234,7 @@ try {
   });
   revisions = createRevisionService({
     save: job => storage.save(job),
+    getPrompts: () => prompts.snapshot(),
     notify: job => {
       jobs.set(job.id, job);
       dialog.update(queue.request);
